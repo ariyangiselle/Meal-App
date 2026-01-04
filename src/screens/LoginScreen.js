@@ -9,7 +9,7 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     // For demo purposes, allow skipping auth if config is missing
-    if (auth.config?.apiKey === "YOUR_API_KEY") {
+    if (!auth.config?.apiKey) {
         navigation.replace('Home');
         return;
     }

@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
+import { OPENAI_API_KEY } from '@env';
 
-// TODO: Initialize with your API Key
-// const openai = new OpenAI({ apiKey: 'YOUR_OPENAI_API_KEY' });
+// const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 export const analyzeImage = async (base64Image) => {
   try {

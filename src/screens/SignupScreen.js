@@ -9,8 +9,8 @@ export default function SignupScreen({ navigation }) {
 
   const handleSignup = async () => {
     // For demo purposes, allow skipping auth if config is missing
-    if (auth.config?.apiKey === "YOUR_API_KEY") {
-        Alert.alert("Demo Mode", "Please configure Firebase in src/config/firebaseConfig.js to enable real signup.");
+    if (!auth.config?.apiKey) {
+        Alert.alert("Demo Mode", "Please configure Firebase in .env to enable real signup.");
         navigation.replace('Home');
         return;
     }
