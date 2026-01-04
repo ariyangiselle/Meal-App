@@ -1,25 +1,75 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../config/firebaseConfig';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../config/firebaseConfig';
+import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import { GOOGLE_WEB_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '@env';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignupScreen({ navigation }) {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    // For Expo Go, we can use the Web Client ID for all platforms
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID || GOOGLE_WEB_CLIENT_ID,
+    iosClientId: GOOGLE_IOS_CLIENT_ID || GOOGLE_WEB_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    redirectUri: makeRedirectUri({
+      useProxy: true,
+    }),
+  });
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      const credential = GoogleAuthProvider.credential(id_token);
+      signInWithCredential(auth, credential)
+        .catch((error) => {
+            Alert.alert("Google Sign-In Error", error.message);
+        });
+    }
+  }, [response]);
 
   const handleSignup = async () => {
-    // For demo purposes, allow skipping auth if config is missing
-    if (!auth.config?.apiKey) {
-        Alert.alert("Demo Mode", "Please configure Firebase in .env to enable real signup.");
-        navigation.replace('Home');
+    if (!name || !email || !password) {
+        Alert.alert("Error", "Please enter name, email and password");
+        return;
+    }
+    
+    if (password.length < 6) {
+        Alert.alert("Error", "Password must be at least 6 characters long");
         return;
     }
 
+    setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      navigation.replace('Home');
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Save user data to Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        name: name,
+        email: email,
+        createdAt: new Date().toISOString(),
+      });
+
+      // Navigation is handled by AuthContext
     } catch (error) {
-      Alert.alert("Signup Error", error.message);
+      let errorMessage = "An error occurred during signup";
+      if (error.code === 'auth/email-already-in-use') errorMessage = "Email is already in use";
+      if (error.code === 'auth/invalid-email') errorMessage = "Invalid email address";
+      if (error.code === 'auth/weak-password') errorMessage = "Password is too weak";
+      
+      Alert.alert("Signup Error", errorMessage);
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -29,10 +79,19 @@ export default function SignupScreen({ navigation }) {
       
       <TextInput
         style={styles.input}
+        placeholder="Full Name"
+        value={name}
+        onChangeText={setName}
+        autoCapitalize="words"
+      />
+
+      <TextInput
+        style={styles.input}
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
+        keyboardType="email-address"
       />
       
       <TextInput
@@ -43,8 +102,26 @@ export default function SignupScreen({ navigation }) {
         secureTextEntry
       />
       
-      <TouchableOpacity style={styles.button} onPress={handleSignup}>
-        <Text style={styles.buttonText}>Sign Up</Text>
+      <TouchableOpacity style={styles.button} onPress={handleSignup} disabled={loading}>
+        {loading ? (
+            <ActivityIndicator color="#fff" />
+        ) : (
+            <Text style={styles.buttonText}>Sign Up</Text>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={[styles.button, styles.googleButton]} 
+        onPress={() => {
+            if (!request) {
+                Alert.alert("Configuration Error", "Google Auth is not configured. Please add Client IDs in SignupScreen.js");
+                return;
+            }
+            promptAsync();
+        }}
+        disabled={!request}
+      >
+        <Text style={[styles.buttonText, styles.googleButtonText]}>Sign up with Google</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
@@ -82,10 +159,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
+  googleButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginTop: 15,
+  },
   buttonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  googleButtonText: {
+    color: '#333',
   },
   linkText: {
     color: '#007AFF',

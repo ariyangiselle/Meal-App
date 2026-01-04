@@ -1,7 +1,17 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { signOut } from 'firebase/auth';
+import { auth } from '../config/firebaseConfig';
 
 export default function HomeScreen({ navigation }) {
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      Alert.alert("Error", "Failed to sign out");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>What's in your fridge?</Text>
@@ -15,6 +25,10 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.buttonText}>Scan Ingredients</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -60,6 +74,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  signOutButton: {
+    marginTop: 20,
+    padding: 15,
+  },
+  signOutText: {
+    color: '#FF3B30',
+    fontSize: 16,
     textAlign: 'center',
   },
 });
